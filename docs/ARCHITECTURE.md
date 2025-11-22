@@ -529,15 +529,305 @@ fn test_auth_require_admin_not_found() {
 
 ---
 
+## Event Distributor Architecture
+
+### Overview
+
+El **Event Distributor** es un contrato avanzado que implementa almacenamiento on-chain para participantes validados y eventos. Mientras el Vault Distributor es stateless, el Event Distributor mantiene estado persistente.
+
+### Comparison with Vault Distributor
+
+| Aspecto | Vault Distributor | Event Distributor |
+|---------|-------------------|-------------------|
+| **State** | Stateless (solo admin) | Stateful (humans + events) |
+| **Storage** | Minimal (1 entry) | Extensive (indexed collections) |
+| **Recipients** | Provided at call time | Stored on-chain with validation |
+| **Distribution** | All provided recipients | Only validated participants |
+| **Use Case** | Simple payroll/airdrops | Curated event distributions |
+
+### Module Structure
+
+```
+src/
+├── lib.rs              # Contract interface (11 public functions)
+├── models.rs           # Data structures (Human, Event)
+├── storage.rs          # Repository pattern with indexing
+├── errors.rs           # 12 error types
+├── events.rs           # 7 event types for auditability
+└── test.rs             # 23 comprehensive tests
+```
+
+### Data Models
+
+#### Human (Participant)
+```rust
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Human {
+    pub address: Address,      // Participant address
+    pub validated: bool,        // Admin-controlled validation
+    pub ipfs_hash: String,      // IPFS hash for metadata (image, bio)
+}
+```
+
+**Design Decision:** Se usa IPFS hash en lugar de Base64 para evitar límites de almacenamiento de Soroban (~200KB por entrada).
+
+#### Event
+```rust
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Event {
+    pub location: String,       // Event location
+    pub event_name: String,     // Human-readable name
+    pub humans: Vec<Address>,   // All participants (validated + unvalidated)
+    pub pool: i128,             // Funding pool in stroops
+}
+```
+
+### Storage Architecture
+
+#### DataKey Enum
+```rust
+pub enum DataKey {
+    Admin,                  // Admin address
+    Human(Address),         // Human by address
+    Event(String),          // Event by ID
+    HumanCount,             // Total humans count
+    HumanIndex(u32),        // Index -> Address mapping for pagination
+}
+```
+
+#### Indexed Storage Pattern
+
+Para soportar paginación eficiente de grandes listas:
+
+```rust
+// Add human with indexing
+pub fn add_human(env: &Env, address: &Address, ipfs_hash: &String) {
+    // 1. Store human data
+    env.storage().persistent().set(&DataKey::Human(address.clone()), &human);
+    
+    // 2. Get current count
+    let count = get_human_count(env);
+    
+    // 3. Create index entry
+    env.storage().persistent().set(&DataKey::HumanIndex(count), address);
+    
+    // 4. Increment count
+    set_human_count(env, count + 1);
+}
+
+// Pagination
+pub fn get_all_humans(env: &Env, start_index: u32, limit: u32) -> Vec<Human> {
+    let mut humans = Vec::new(&env);
+    let count = get_human_count(env);
+    
+    for i in start_index..min(start_index + limit, count) {
+        let address = env.storage().persistent()
+            .get::<DataKey, Address>(&DataKey::HumanIndex(i))
+            .unwrap();
+        let human = get_human(env, &address);
+        humans.push_back(human);
+    }
+    
+    humans
+}
+```
+
+### Business Logic Flow
+
+#### Distribution with Validation Filter
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant Contract
+    participant Storage
+    participant Token
+    participant Validated
+    participant Unvalidated
+    
+    Admin->>Contract: distribute_event_pool(event_id, token)
+    Contract->>Storage: get_event(event_id)
+    Storage-->>Contract: Event{humans: [h1, h2, h3, h4]}
+    
+    loop For each human in event
+        Contract->>Storage: get_human(address)
+        Storage-->>Contract: Human{validated: true/false}
+        alt is validated
+            Contract->>Contract: Add to filtered list
+        else not validated
+            Contract->>Contract: Skip
+        end
+    end
+    
+    Contract->>Contract: Calculate: pool / validated_count
+    
+    loop For each validated human
+        Contract->>Token: transfer(contract, human, amount)
+        Token-->>Validated: Transfer XLM
+    end
+    
+    Contract->>Admin: DistributionCompletedEvent
+    
+    Note over Unvalidated: No funds received
+```
+
+### SOLID Principles Applied
+
+#### 1. Single Responsibility
+
+Cada módulo tiene responsabilidad única:
+
+- **lib.rs**: Orquestación y interfaz pública
+- **models.rs**: Definición de estructuras de datos
+- **storage.rs**: Persistencia y recuperación
+- **errors.rs**: Manejo centralizado de errores
+- **events.rs**: Auditabilidad
+
+#### 2. Open/Closed
+
+Extensible sin modificar código existente:
+
+```rust
+// Agregar nuevo tipo de validación: solo modificar esta función
+pub fn update_human_validation(env: Env, admin: Address, human_address: Address, validated: bool) {
+    require_admin(&env, &admin);
+    
+    // Posible extensión: validación multi-nivel
+    // let validation_level = get_validation_level(&env, &human_address);
+    
+    let mut human = storage::get_human(&env, &human_address);
+    human.validated = validated;
+    storage::update_human(&env, &human);
+    
+    events::emit_human_validation_updated(&env, human_address, validated);
+}
+```
+
+#### 3. Dependency Inversion
+
+Storage abstraction permite cambiar implementación:
+
+```rust
+// High-level module (lib.rs)
+pub fn add_human(env: Env, human_address: Address, ipfs_hash: String) {
+    storage::add_human(&env, &human_address, &ipfs_hash);
+}
+
+// Low-level module (storage.rs)
+pub fn add_human(env: &Env, address: &Address, ipfs_hash: &String) {
+    // Implementation details
+    // Puede cambiar de Persistent a Temporary o Instance sin afectar lib.rs
+}
+```
+
+### Error Handling Strategy
+
+12 error types específicos con códigos:
+
+```rust
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ContractError {
+    AlreadyInitialized = 1,
+    AdminNotFound = 2,
+    Unauthorized = 3,
+    HumanAlreadyExists = 4,
+    HumanNotFound = 5,
+    EventAlreadyExists = 6,
+    EventNotFound = 7,
+    HumanAlreadyInEvent = 8,
+    NoValidatedHumans = 9,
+    InvalidAmount = 10,
+    ZeroAmountPerRecipient = 11,
+    MathError = 12,
+}
+```
+
+### Event Emission Strategy
+
+7 eventos para trazabilidad completa:
+
+```rust
+pub fn emit_human_added(env: &Env, address: Address, ipfs_hash: String)
+pub fn emit_human_validation_updated(env: &Env, address: Address, validated: bool)
+pub fn emit_human_image_updated(env: &Env, address: Address, new_hash: String)
+pub fn emit_event_created(env: &Env, event_id: String, pool: i128)
+pub fn emit_human_added_to_event(env: &Env, event_id: String, address: Address)
+pub fn emit_distribution_completed(env: &Env, event_id: String, total: i128, recipients: u32)
+pub fn emit_admin_set(env: &Env, admin: Address)
+```
+
+### Testing Strategy
+
+23 tests organizados por categoría:
+
+1. **Initialization** (3 tests)
+   - Success, double init prevention, not initialized
+
+2. **Human Management** (7 tests)
+   - Add, duplicate, update validation/image, get, not found, pagination
+
+3. **Event Management** (7 tests)
+   - Create, invalid pool, duplicate, add human, errors, get validated
+
+4. **Distribution** (6 tests)
+   - No validated, nonexistent event, single/multiple recipients, amount validation
+
+### Performance Considerations
+
+#### Storage Costs
+
+- **Human entry**: ~100 bytes (address + bool + IPFS hash)
+- **Event entry**: ~200 bytes + (n * 32) for addresses
+- **Index entry**: ~40 bytes per human
+
+#### Gas Optimization
+
+```rust
+// Batch operations cuando sea posible
+pub fn add_multiple_humans_to_event(env: Env, event_id: String, humans: Vec<Address>) {
+    let mut event = storage::get_event(&env, &event_id);
+    
+    for human in humans.iter() {
+        // Validar existence una vez al inicio
+        storage::require_human_exists(&env, &human);
+        event.humans.push_back(human);
+    }
+    
+    // Un solo write al final
+    storage::update_event(&env, &event_id, &event);
+}
+```
+
+### Security Considerations
+
+1. **Admin Privileges**
+   - Solo admin puede: crear eventos, validar participantes, agregar a eventos, distribuir
+
+2. **Validation Filtering**
+   - Distribución siempre filtra por `validated: true`
+   - No hay forma de bypasear esta validación
+
+3. **IPFS Integrity**
+   - Contract no valida contenido de IPFS
+   - Frontend debe verificar que hash corresponde a imagen válida
+
+4. **Amount Validation**
+   - Pool debe ser > 0
+   - Pool / validated_count debe ser > 0 (evita pérdida de fondos)
+
+---
+
 ## Conclusión
 
-La refactorización transforma un contrato monolítico de 144 líneas en una **arquitectura modular profesional** que:
+El proyecto ReFi Universe ahora cuenta con **dos contratos complementarios**:
 
-✅ Sigue principios SOLID  
-✅ Es fácil de mantener y extender  
-✅ Tiene separación clara de responsabilidades  
-✅ Es altamente testeable  
-✅ Maneja errores de forma consistente  
-✅ Está documentado con Rust doc comments  
+1. **Vault Distributor**: Simple, stateless, ideal para distribuciones rápidas
+2. **Event Distributor**: Avanzado, stateful, ideal para comunidades curadas
 
-**El código ahora es production-ready para un proyecto empresarial.**
+Ambos siguen principios SOLID, tienen alta cobertura de tests (42/42), y están production-ready para testnet.
+
+**Próximo paso:** Deploy Event Distributor a testnet para validación end-to-end.

@@ -1,12 +1,36 @@
-# 📖 Guía de Deployment y Uso - Vault Distributor
+# 📖 Guía de Deployment - ReFi Universe Contracts
 
-## 🎯 Información del Vault RefiUp
+## 📋 Tabla de Contenidos
 
+- [Contratos Desplegados](#-contratos-desplegados)
+- [Vault Distributor Deployment](#-vault-distributor-deployment)
+- [Event Distributor Deployment](#-event-distributor-deployment)
+- [Verificación](#-verificación)
+- [Uso Básico](#-uso-básico)
+
+---
+
+## 🎯 Contratos Desplegados
+
+### Vault Distributor (Production)
+**Contract ID:** `CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM`  
+**Network:** Stellar Testnet  
+**Status:** ✅ Active  
+**Explorer:** [Ver en Stellar Expert](https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM)
+
+### Event Distributor (Ready)
+**Status:** ✅ Ready for deployment  
+**Script:** `./deploy_event_distributor.sh`
+
+### Vault RefiUp (Reference)
 **Vault Contract:** `CA3N53CPBLSVM5342DZ25LK47WFQDS6R3BT62327SGZCNJ54CDDXO7KZ`  
 **Manager/Admin:** `GAUSHAKPQJEHLKT4FBUVMWXOX3HUVV5OXNFUY54OBWS2R7ZUQY6QUBR6`  
 **Token Pair:** XLM/USDC  
-**Network:** Stellar Testnet  
-**Explorer:** [Ver en Stellar Expert](https://stellar.expert/explorer/testnet/contract/CA3N53CPBLSVM5342DZ25LK47WFQDS6R3BT62327SGZCNJ54CDDXO7KZ)
+**Network:** Stellar Testnet
+
+---
+
+## 🏦 Vault Distributor Deployment
 
 ---
 
@@ -285,8 +309,217 @@ stellar contract invoke --source-account unauthorized ...
 
 ---
 
+## 🎪 Event Distributor Deployment
+
+### Opción 1: Script Automatizado (Recomendado)
+
+```bash
+# Ejecutar script de deployment
+./deploy_event_distributor.sh
+```
+
+El script automáticamente:
+- ✅ Compila el contrato a WASM
+- ✅ Verifica/crea la wallet admin
+- ✅ Despliega el contrato a testnet
+- ✅ Inicializa con el admin
+- ✅ Verifica el deployment
+- ✅ Guarda configuración en `.env.event-distributor`
+
+### Opción 2: Deployment Manual
+
+```bash
+# 1. Compilar contrato
+cd contracts/event-distributor
+cargo build --target wasm32-unknown-unknown --release
+cd ../..
+
+# 2. Desplegar
+stellar contract deploy \
+  --wasm contracts/event-distributor/target/wasm32-unknown-unknown/release/event_distributor.wasm \
+  --source-account admin \
+  --network testnet \
+  --alias event_distributor
+
+# 3. Obtener Contract ID
+CONTRACT_ID=$(stellar contract id event_distributor --network testnet)
+ADMIN_ADDRESS=$(stellar keys address admin)
+
+# 4. Inicializar
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --source-account admin \
+  --network testnet \
+  -- init \
+  --admin $ADMIN_ADDRESS
+
+# 5. Verificar
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --network testnet \
+  -- get_admin
+```
+
+---
+
+## 🎯 Uso del Event Distributor
+
+### 1. Agregar Participantes
+
+```bash
+# Agregar participante con IPFS metadata
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --source-account admin \
+  --network testnet \
+  -- add_human \
+  --human_address GABC123... \
+  --ipfs_hash "QmX7fK8R9dH3zLq4wN8pY2tM5cB6vJ1eA9oF4xK3nH2gP8"
+```
+
+### 2. Validar Participantes
+
+```bash
+# Validar participante (solo admin)
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --source-account admin \
+  --network testnet \
+  -- update_human_validation \
+  --human_address GABC123... \
+  --validated true
+
+# Invalidar participante
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --source-account admin \
+  --network testnet \
+  -- update_human_validation \
+  --human_address GABC123... \
+  --validated false
+```
+
+### 3. Crear Evento
+
+```bash
+# Crear evento con pool de fondos
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --source-account admin \
+  --network testnet \
+  -- create_event \
+  --event_id "refi_meetup_001" \
+  --location "Buenos Aires, Argentina" \
+  --pool 1000000000  # 100 XLM
+```
+
+### 4. Agregar Participantes al Evento
+
+```bash
+# Agregar participante al evento
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --source-account admin \
+  --network testnet \
+  -- add_human_to_event \
+  --event_id "refi_meetup_001" \
+  --human_address GABC123...
+```
+
+### 5. Ver Participantes Validados
+
+```bash
+# Listar solo participantes validados del evento
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --network testnet \
+  -- get_event_validated_humans \
+  --event_id "refi_meetup_001"
+```
+
+### 6. Distribuir Pool del Evento
+
+```bash
+# Distribuir equitativamente solo a participantes validados
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --source-account admin \
+  --network testnet \
+  -- distribute_event_pool \
+  --event_id "refi_meetup_001" \
+  --token CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+```
+
+### 7. Consultar Participantes (con Paginación)
+
+```bash
+# Obtener primeros 10 participantes
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --network testnet \
+  -- get_all_humans \
+  --start_index 0 \
+  --limit 10
+
+# Obtener siguientes 10
+stellar contract invoke \
+  --id $CONTRACT_ID \
+  --network testnet \
+  -- get_all_humans \
+  --start_index 10 \
+  --limit 10
+```
+
+---
+
+## 📊 Ejemplo de Flujo Completo
+
+### Escenario: ReFi Meetup con 5 participantes, 3 validados
+
+```bash
+# Variables
+CONTRACT_ID="<YOUR_CONTRACT_ID>"
+EVENT_ID="refi_ba_2025"
+LOCATION="Buenos Aires"
+POOL=5000000000  # 500 XLM
+TOKEN="CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+
+# 1. Agregar 5 participantes
+for i in {1..5}; do
+  stellar contract invoke --id $CONTRACT_ID --source-account admin --network testnet \
+    -- add_human --human_address "$(stellar keys address participant$i)" \
+    --ipfs_hash "QmHash$i"
+done
+
+# 2. Validar solo 3 participantes
+for i in {1..3}; do
+  stellar contract invoke --id $CONTRACT_ID --source-account admin --network testnet \
+    -- update_human_validation --human_address "$(stellar keys address participant$i)" \
+    --validated true
+done
+
+# 3. Crear evento
+stellar contract invoke --id $CONTRACT_ID --source-account admin --network testnet \
+  -- create_event --event_id "$EVENT_ID" --location "$LOCATION" --pool $POOL
+
+# 4. Agregar los 5 participantes al evento
+for i in {1..5}; do
+  stellar contract invoke --id $CONTRACT_ID --source-account admin --network testnet \
+    -- add_human_to_event --event_id "$EVENT_ID" \
+    --human_address "$(stellar keys address participant$i)"
+done
+
+# 5. Distribuir pool (solo a los 3 validados)
+# Resultado: 166.67 XLM cada uno (500 / 3)
+stellar contract invoke --id $CONTRACT_ID --source-account admin --network testnet \
+  -- distribute_event_pool --event_id "$EVENT_ID" --token $TOKEN
+```
+
+---
+
 ## 🔗 Enlaces Útiles
 
+- **Vault Distributor Explorer**: https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM
 - **Vault RefiUp Explorer**: https://stellar.expert/explorer/testnet/contract/CA3N53CPBLSVM5342DZ25LK47WFQDS6R3BT62327SGZCNJ54CDDXO7KZ
 - **Stellar Expert Testnet**: https://stellar.expert/explorer/testnet
 - **Stellar Lab**: https://lab.stellar.org/
@@ -297,17 +530,29 @@ stellar contract invoke --source-account unauthorized ...
 
 ## 📝 Notas Importantes
 
+### General
 1. **Gas Fees**: Todas las transacciones requieren XLM para fees
 2. **TTL (Time To Live)**: Los contratos en testnet expiran después de cierto tiempo
 3. **Testnet Reset**: Testnet se resetea ocasionalmente, guarda tu configuración
-4. **Balance del Contrato**: Verifica que el contrato tenga suficientes fondos antes de distribuir
-5. **Eventos**: Todos los distribuciones emiten eventos para auditoría
+4. **Eventos**: Todas las operaciones emiten eventos para auditoría
+
+### Vault Distributor
+- **Balance del Contrato**: Verifica que el contrato tenga fondos antes de distribuir
+- **Parámetros en tiempo real**: Recipients se proveen en cada distribución
+
+### Event Distributor
+- **Almacenamiento On-chain**: Participants y events se guardan permanentemente
+- **Validación Requerida**: Solo participantes con `validated: true` reciben fondos
+- **IPFS Metadata**: Contract solo guarda hash, no valida contenido
+- **Pagination**: Usa `get_all_humans` con índices para listas grandes
 
 ---
 
 ## 🆘 Troubleshooting
 
-### El contrato no tiene fondos suficientes
+### Vault Distributor
+
+#### El contrato no tiene fondos suficientes
 ```bash
 # Verificar balance
 stellar contract invoke --id <TOKEN> --network testnet -- balance --id $CONTRACT_ID
@@ -317,7 +562,7 @@ stellar contract invoke --id <TOKEN> --source-account admin --network testnet \
   -- transfer --from <YOUR_WALLET> --to $CONTRACT_ID --amount <AMOUNT>
 ```
 
-### Error de autenticación
+#### Error de autenticación
 ```bash
 # Verificar que eres el admin
 stellar contract invoke --id $CONTRACT_ID --network testnet -- get_admin
@@ -326,12 +571,51 @@ stellar contract invoke --id $CONTRACT_ID --network testnet -- get_admin
 stellar keys address admin
 ```
 
-### Contrato expiró en testnet
+### Event Distributor
+
+#### Error: HumanNotFound
 ```bash
-# Re-desplegar
+# Verificar que el participante existe
+stellar contract invoke --id $CONTRACT_ID --network testnet \
+  -- get_human --human_address <ADDRESS>
+
+# Si no existe, agregarlo primero
+stellar contract invoke --id $CONTRACT_ID --source-account admin --network testnet \
+  -- add_human --human_address <ADDRESS> --ipfs_hash "<HASH>"
+```
+
+#### Error: NoValidatedHumans
+```bash
+# Ver participantes validados del evento
+stellar contract invoke --id $CONTRACT_ID --network testnet \
+  -- get_event_validated_humans --event_id "<EVENT_ID>"
+
+# Validar al menos un participante
+stellar contract invoke --id $CONTRACT_ID --source-account admin --network testnet \
+  -- update_human_validation --human_address <ADDRESS> --validated true
+```
+
+#### Error: ZeroAmountPerRecipient
+```bash
+# El pool es muy pequeño para la cantidad de validados
+# Solución: Aumentar el pool o reducir participantes validados
+
+# Ver detalles del evento
+stellar contract invoke --id $CONTRACT_ID --network testnet \
+  -- get_event --event_id "<EVENT_ID>"
+```
+
+### Ambos Contratos
+
+#### Contrato expiró en testnet
+```bash
+# Re-desplegar Vault Distributor
 ./deploy.sh
+
+# Re-desplegar Event Distributor
+./deploy_event_distributor.sh
 ```
 
 ---
 
-**Última actualización**: 21 de noviembre de 2025
+**Última actualización**: 22 de noviembre de 2025

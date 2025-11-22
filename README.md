@@ -1,124 +1,188 @@
-# 🏦 Vault Distributor Smart Contract
+# 🌐 ReFi Universe Smart Contracts
 
 [![Stellar](https://img.shields.io/badge/Stellar-Soroban-7D00FF?style=flat&logo=stellar)](https://stellar.org)
 [![Rust](https://img.shields.io/badge/Rust-1.91+-orange?style=flat&logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-19%2F19-brightgreen.svg)](contracts/vault-distributor/src/test.rs)
+[![Tests](https://img.shields.io/badge/tests-42%2F42-brightgreen.svg)](#-testing)
 
-> A production-ready Stellar Soroban smart contract for automated and equitable fund distribution from a centralized vault to multiple recipients.
+> Production-ready Stellar Soroban smart contracts suite for regenerative finance: automated fund distribution and validated participant management.
 
-**Live on Testnet:** [`CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM`](https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM)
+**Vault Distributor on Testnet:** [`CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM`](https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM)
+
+---
+
+## 📦 Contracts
+
+This repository contains two complementary smart contracts:
+
+### 🏦 [Vault Distributor](contracts/vault-distributor/README.md)
+Simple parameter-based distribution contract for equitable fund allocation.
+
+- ✅ **Parameter-based**: Recipients provided at distribution time
+- 💸 **Equitable Division**: Automatic calculation of equal amounts
+- 🚀 **Lightweight**: ~15KB WASM, 19 tests
+- 🔒 **Admin-controlled**: Secure authorization
+- **Use cases**: Payroll, airdrops, rewards, grant distribution
+
+### 🎪 [Event Distributor](contracts/event-distributor/README.md)
+Advanced contract with on-chain storage for validated participants and event management.
+
+- 📊 **On-chain Storage**: Persistent participant data with IPFS metadata
+- ✅ **Validation System**: Admin-controlled participant validation
+- 🎯 **Event Management**: Create events with participant lists
+- 🔍 **Smart Filtering**: Automatic distribution to validated participants only
+- 📄 **Pagination**: Query large participant lists efficiently
+- 🧪 **Tested**: 23 comprehensive tests
+- **Use cases**: ReFi events, validated communities, curated distributions
 
 ---
 
 ## 📑 Table of Contents
 
+- [Contracts](#-contracts)
 - [Overview](#-overview)
-- [Key Features](#-key-features)
 - [Architecture](#-architecture)
 - [Quick Start](#-quick-start)
-- [Usage](#-usage)
-- [Contract API](#-contract-api)
 - [Testing](#-testing)
 - [Deployment](#-deployment)
 - [Documentation](#-documentation)
 - [Project Status](#-project-status)
-- [Contributing](#-contributing)
 - [License](#-license)
 
 ---
 
 ## 🎯 Overview
 
-Vault Distributor is a smart contract built with Rust and Stellar's Soroban SDK that enables secure, equitable distribution of tokens (like XLM) from a centralized vault to multiple recipients. The contract implements enterprise-grade patterns including:
+ReFi Universe is a suite of smart contracts built with Rust and Stellar's Soroban SDK for regenerative finance applications. The contracts enable secure, equitable distribution of tokens with different levels of participant management.
+
+Both contracts implement enterprise-grade patterns:
 
 - **SOLID Principles** for maintainable architecture
-- **Repository Pattern** for data persistence
+- **Repository Pattern** for data persistence  
 - **Event-Driven** design for auditability
 - **Comprehensive Validation** for security
 - **100% Test Coverage** for reliability
 
-### Use Cases
+### Comparison
 
-- 💰 **Payroll Distribution**: Automated salary payments to employees
-- 🎁 **Airdrop Campaigns**: Mass token distribution to communities
-- 🏆 **Rewards Programs**: Prize distribution to winners/participants
-- 🤝 **Grant Distribution**: Equitable funding to multiple projects
-- 💸 **Revenue Sharing**: Automatic profit distribution to stakeholders
+| Feature | Vault Distributor | Event Distributor |
+|---------|-------------------|-------------------|
+| **Storage** | Stateless | On-chain participants & events |
+| **Recipients** | Provided at call time | Filtered from stored data |
+| **Validation** | Off-chain | On-chain validation status |
+| **Use Case** | Simple distributions | Event-based with curation |
+| **WASM Size** | ~15KB | ~15KB |
+| **Tests** | 19 | 23 |
 
 ---
 
 ## ✨ Key Features
 
-### Security
-- 🔐 **Admin-Only Operations**: All distributions require authentication from registered admin
-- ✅ **Input Validation**: Comprehensive checks on all parameters (recipients, amounts, etc.)
-- 🛡️ **Overflow Protection**: Safe arithmetic operations using `checked_div()`
-- 🚫 **Double Initialization Prevention**: Cannot reinitialize admin after setup
+### Shared Features (Both Contracts)
+- 🔐 **Admin-Only Operations**: All critical operations require authentication
+- ✅ **Input Validation**: Comprehensive parameter checks
+- 🛡️ **Overflow Protection**: Safe arithmetic with `checked_div()`
+- 💸 **Equitable Distribution**: Automatic equal amount calculation
+- 📊 **Event Emission**: Full auditability through events
+- ⚡ **Optimized**: Small WASM footprint
 
-### Functionality
-- 💸 **Equitable Distribution**: Automatic calculation of per-recipient amounts
-- 📊 **Event Emission**: Structured events for all operations (AdminSetEvent, DistributionEvent)
-- 🔄 **Multiple Distributions**: Support for sequential distributions without limits
-- 💎 **Decimal Handling**: Proper handling of amounts with fractional division
-
-### Quality
-- 🧪 **19 Unit Tests**: 100% passing with comprehensive coverage
-- 📐 **Modular Architecture**: 7 independent modules following Single Responsibility Principle
-- 📝 **Complete Documentation**: 8 comprehensive documentation files
-- ⚡ **Optimized**: ~15KB WASM binary for efficient execution
+### Event Distributor Exclusive
+- 📋 **Participant Registry**: On-chain storage with IPFS metadata
+- ✅ **Validation System**: Admin-controlled participant approval
+- 🎯 **Event Management**: Create events with participant lists
+- 🔍 **Smart Filtering**: Only validated participants receive funds
+- 📄 **Pagination**: Efficient querying of large datasets
 
 ---
 
 ## 🏗️ Architecture
 
-### System Overview
+### Contracts Ecosystem
 
 ```mermaid
 graph TB
-    subgraph "External Actors"
+    subgraph "ReFi Universe"
+        VD[Vault Distributor<br/>Parameter-based]
+        ED[Event Distributor<br/>Storage-based]
+    end
+    
+    subgraph "External Systems"
         A[Admin Wallet]
-        V[Vault/Token Contract]
+        T[Token Contracts<br/>XLM, USDC, etc.]
+        IPFS[IPFS Network<br/>Metadata Storage]
+    end
+    
+    subgraph "Recipients"
         R1[Recipient 1]
         R2[Recipient 2]
         R3[Recipient N]
     end
     
-    subgraph "Vault Distributor Contract"
-        direction TB
-        E[Entry Point<br/>lib.rs]
-        
-        subgraph "Core Modules"
-            AUTH[Authentication<br/>auth.rs]
-            VAL[Validation<br/>validation.rs]
-            TOK[Token Operations<br/>token_operations.rs]
-        end
-        
-        subgraph "Infrastructure"
-            STOR[Storage<br/>storage.rs]
-            EVT[Events<br/>events.rs]
-            ERR[Errors<br/>errors.rs]
-        end
+    A -->|Manage| VD
+    A -->|Manage + Validate| ED
+    VD -->|Transfer| T
+    ED -->|Transfer| T
+    ED -.->|Metadata| IPFS
+    T -->|Distribute| R1
+    T -->|Distribute| R2
+    T -->|Distribute| R3
+    
+    style VD fill:#7D00FF,color:#fff
+    style ED fill:#FF6B6B,color:#fff
+    style A fill:#4ECDC4,color:#fff
+    style T fill:#45B7D1,color:#fff
+    style IPFS fill:#96CEB4,color:#fff
+```
+
+### Vault Distributor Architecture
+
+```mermaid
+graph TB
+    subgraph "Vault Distributor Modules"
+        L[lib.rs<br/>Entry Point]
+        A[auth.rs<br/>Admin Auth]
+        V[validation.rs<br/>Input Checks]
+        T[token_operations.rs<br/>Transfers]
+        S[storage.rs<br/>Admin Data]
+        E[events.rs<br/>Auditability]
+        R[errors.rs<br/>Error Types]
     end
     
-    A -->|1. Call distribute| E
-    E -->|2. Verify admin| AUTH
-    AUTH -->|3. Check storage| STOR
-    E -->|4. Validate inputs| VAL
-    E -->|5. Execute transfers| TOK
-    TOK -->|6. Transfer tokens| V
-    V -->|7. Send to recipients| R1
-    V -->|7. Send to recipients| R2
-    V -->|7. Send to recipients| R3
-    E -->|8. Emit events| EVT
+    L --> A
+    L --> V
+    L --> T
+    A --> S
+    L --> E
     
-    style E fill:#7D00FF,color:#fff
-    style AUTH fill:#FF6B6B,color:#fff
-    style VAL fill:#4ECDC4,color:#fff
-    style TOK fill:#45B7D1,color:#fff
-    style STOR fill:#96CEB4,color:#fff
-    style EVT fill:#FFEAA7,color:#333
-    style ERR fill:#DFE6E9,color:#333
+    style L fill:#7D00FF,color:#fff
+    style A fill:#FF6B6B,color:#fff
+    style V fill:#4ECDC4,color:#fff
+    style T fill:#45B7D1,color:#fff
+    style S fill:#96CEB4,color:#fff
+```
+
+### Event Distributor Architecture
+
+```mermaid
+graph TB
+    subgraph "Event Distributor Modules"
+        L2[lib.rs<br/>Entry Point<br/>15+ Functions]
+        M[models.rs<br/>Human + Event]
+        S2[storage.rs<br/>Repository Pattern<br/>Indexed Storage]
+        E2[events.rs<br/>7 Event Types]
+        R2[errors.rs<br/>12 Error Types]
+        T2[test.rs<br/>23 Unit Tests]
+    end
+    
+    L2 --> M
+    L2 --> S2
+    L2 --> E2
+    M --> S2
+    
+    style L2 fill:#FF6B6B,color:#fff
+    style M fill:#7D00FF,color:#fff
+    style S2 fill:#4ECDC4,color:#fff
+    style E2 fill:#96CEB4,color:#fff
 ```
 
 ### Contract Flow
@@ -211,115 +275,97 @@ graph LR
 
 - **Rust** >= 1.91.1 ([Install](https://rustup.rs))
 - **Stellar CLI** >= 23.2.1 ([Install](https://developers.stellar.org/docs/tools/cli))
-- **WebAssembly Target**: `wasm32v1-none`
+- **WebAssembly Target**: `wasm32-unknown-unknown`
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/DevCristobalvc/refi-universe-sc.git
-cd refi-universe-sc
+git clone https://github.com/refiup/sc.git
+cd sc
 
-# Install dependencies
-rustup target add wasm32v1-none
-
-# Configure environment variables
-cp .env.example .env
-# Edit .env with your configuration
+# Install Rust target
+rustup target add wasm32-unknown-unknown
 ```
 
 ### Build & Test
 
+#### Vault Distributor
 ```bash
-# Navigate to contract directory
 cd contracts/vault-distributor
 
-# Run tests (19 tests should pass)
+# Run tests (19 tests)
 cargo test
 
-# Build optimized WASM
-cargo build --target wasm32v1-none --release
-
-# WASM output: target/wasm32v1-none/release/vault_distributor.wasm (~15KB)
+# Build WASM
+cargo build --target wasm32-unknown-unknown --release
 ```
 
----
-
-## 💻 Usage
-
-### 1. Initialize Contract
-
+#### Event Distributor
 ```bash
-# Deploy contract (returns CONTRACT_ID)
-stellar contract deploy \
-  --wasm target/wasm32v1-none/release/vault_distributor.wasm \
-  --source admin \
-  --network testnet
+cd contracts/event-distributor
 
-# Initialize with admin address
-stellar contract invoke \
-  --id <CONTRACT_ID> \
-  --source admin \
-  --network testnet \
-  -- init --admin <ADMIN_ADDRESS>
+# Run tests (23 tests)
+cargo test
+
+# Build WASM
+cargo build --target wasm32-unknown-unknown --release
 ```
 
-### 2. Distribute Funds
-
+### All Tests
 ```bash
-# Distribute 100 XLM to 2 recipients (50 XLM each)
-stellar contract invoke \
-  --id CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM \
-  --source admin \
-  --network testnet \
-  -- distribute \
-  --token <TOKEN_ADDRESS> \
-  --recipients '["<RECIPIENT1>", "<RECIPIENT2>"]' \
-  --total_amount 1000000000
-```
+# From repository root
+cargo test --all
 
-### 3. Query Admin
-
-```bash
-# Get current admin address
-stellar contract invoke \
-  --id CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM \
-  --source admin \
-  --network testnet \
-  -- get_admin
+# Expected: 42/42 tests passing
 ```
 
 ---
 
-## 📡 Contract API
+## 💻 Usage Examples
 
-### Functions
+### Vault Distributor - Simple Distribution
 
-#### `init(admin: Address)`
-Initializes the contract with an admin address. Can only be called once.
+```rust
+// Initialize
+client.init(&admin);
 
-**Parameters:**
-- `admin`: Address that will have distribution privileges
+// Distribute 100 XLM to 3 recipients (33.33 XLM each)
+let recipients = vec![&env, recipient1, recipient2, recipient3];
+client.distribute(&token, &recipients, &1000000000);
+```
 
-**Emits:** `AdminSetEvent`
+### Event Distributor - Validated Distribution
 
-**Errors:**
-- `AlreadyInitialized` (1): Admin already set
+```rust
+// Initialize
+client.init(&admin);
 
----
+// Add participants
+client.add_human(&human1, &String::from_str(&env, "QmHash1"));
+client.add_human(&human2, &String::from_str(&env, "QmHash2"));
 
-#### `get_admin() -> Address`
-Returns the current admin address.
+// Validate some participants
+client.update_human_validation(&human1, &true);
 
-**Returns:** Admin Address
+// Create event
+client.create_event(
+    &String::from_str(&env, "event_001"),
+    &String::from_str(&env, "Buenos Aires"),
+    &1000000000
+);
 
-**Errors:**
-- `AdminNotFound` (2): Admin not initialized
+// Add participants to event
+client.add_human_to_event(&String::from_str(&env, "event_001"), &human1);
+client.add_human_to_event(&String::from_str(&env, "event_001"), &human2);
 
----
+// Distribute only to validated participants (human1 only)
+client.distribute_event_pool(&String::from_str(&env, "event_001"), &token);
+```
 
-#### `distribute(token: Address, recipients: Vec<Address>, total_amount: i128)`
-Distributes tokens equitably to multiple recipients.
+**For complete API documentation:**
+- [Vault Distributor API](contracts/vault-distributor/README.md#contract-api)
+- [Event Distributor API](contracts/event-distributor/README.md#api-reference)
 
 **Parameters:**
 - `token`: Token contract address (e.g., XLM native token)
@@ -344,50 +390,49 @@ amount_per_recipient = total_amount / recipients.len()
 
 ## 🧪 Testing
 
-### Run Tests
+### Test Coverage: 42/42 Tests Passing ✓
 
 ```bash
-cd contracts/vault-distributor
-cargo test -- --nocapture
+# Run all tests (both contracts)
+cargo test --all
+
+# Test individual contracts
+cd contracts/vault-distributor && cargo test     # 19 tests
+cd contracts/event-distributor && cargo test     # 23 tests
 ```
 
-### Test Coverage
+### Vault Distributor Tests (19)
 
-- **19 Total Tests** (100% passing)
-- **100% Function Coverage**
-- **~95% Branch Coverage**
+**Coverage:**
+- Initialization (2 tests)
+- Distribution logic (6 tests)
+- Authorization (4 tests)
+- Amount calculations (7 tests)
 
-#### Test Categories:
+**Key Scenarios:**
+- ✅ Equitable distribution with remainders
+- ✅ Large recipient lists (100+)
+- ✅ Maximum amount handling (i128::MAX)
+- ✅ Zero/negative amount rejection
+- ✅ Unauthorized access prevention
 
-**Initialization Tests (4)**
-- ✅ Successful initialization
-- ✅ Double initialization prevention
-- ✅ Admin authentication required
-- ✅ Admin persistence
+### Event Distributor Tests (23)
 
-**Validation Tests (5)**
-- ✅ Empty recipients rejection
-- ✅ Invalid amount rejection (zero/negative)
-- ✅ Amount too small for distribution
-- ✅ Minimum valid amount
-- ✅ Maximum i128 amount
+**Coverage:**
+- Initialization (3 tests)
+- Human management (7 tests)
+- Event management (7 tests)
+- Distribution with validation (6 tests)
 
-**Distribution Tests (9)**
-- ✅ Single recipient distribution
-- ✅ Multiple recipients (2-10+)
-- ✅ Exact division (no remainder)
-- ✅ Division with remainder (floor)
-- ✅ Sequential distributions
-- ✅ Duplicate recipients
-- ✅ Large amounts
-- ✅ Admin authorization required
+**Key Scenarios:**
+- ✅ On-chain participant storage with IPFS
+- ✅ Validation status management
+- ✅ Event creation with participant lists
+- ✅ Filtering validated participants
+- ✅ Pagination for large datasets
+- ✅ Distribution to validated humans only
 
-**Edge Cases**
-- ✅ 1 stroops to 2 recipients = 0 per recipient (error)
-- ✅ 10 stroops to 2 recipients = 5 stroops each
-- ✅ 100 stroops to 3 recipients = 33 stroops each (1 remainder lost)
-
-See [docs/TESTING.md](docs/TESTING.md) for detailed test report.
+See [docs/TESTING.md](docs/TESTING.md) for detailed test reports.
 
 ---
 
@@ -450,24 +495,30 @@ Comprehensive documentation available in the `docs/` directory:
 
 ### Metrics
 
-| Metric | Value |
-|--------|-------|
-| **Code Lines** | ~1,300 (contract + tests) |
-| **Modules** | 7 (SOLID architecture) |
-| **Test Coverage** | 100% functions, 95% branches |
-| **Tests Passing** | 19/19 (100%) |
-| **WASM Size** | ~15KB (optimized) |
-| **Documentation** | 8 comprehensive files |
-| **Use Cases** | 11/11 completed |
-| **Network** | Stellar Testnet (active) |
+| Metric | Vault Distributor | Event Distributor | Total |
+|--------|------------------|-------------------|-------|
+| **Code Lines** | ~1,300 | ~1,500 | ~2,800 |
+| **Modules** | 7 | 6 | 13 |
+| **Tests** | 19 | 23 | 42 |
+| **Test Pass Rate** | 100% | 100% | 100% |
+| **WASM Size** | ~15KB | ~15KB | ~30KB |
+| **Functions** | 3 | 11 | 14 |
+| **Errors** | 5 | 12 | 17 |
+| **Events** | 2 | 7 | 9 |
 
-### Live Contract
+### Live Contracts
 
+#### Vault Distributor
 **Network:** Stellar Testnet  
 **Contract ID:** `CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM`  
 **Explorer:** [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM)  
 **Status:** ✅ Active & Tested  
-**Transactions:** 197+ XLM distributed in testnet
+**Transactions:** 197+ XLM distributed
+
+#### Event Distributor
+**Status:** ✅ Ready for deployment  
+**Tests:** 23/23 passing  
+**Next Step:** Testnet deployment
 
 ### Technology Stack
 
@@ -475,34 +526,15 @@ Comprehensive documentation available in the `docs/` directory:
 Language: Rust 1.91.1
 Framework: Soroban SDK v23
 Blockchain: Stellar (Soroban)
-Target: WebAssembly (wasm32v1-none)
+Target: WebAssembly (wasm32-unknown-unknown)
 Tools:
   - Stellar CLI v23.2.1
   - Cargo (Rust package manager)
   - Git (version control)
+Storage: Persistent on-chain (Event Distributor)
 Testing: Native Rust tests (cargo test)
-CI/CD: Manual (deploy.sh script)
+Documentation: 8 comprehensive markdown files
 ```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these guidelines:
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'feat: add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
-### Development Guidelines
-
-- Follow SOLID principles
-- Write tests for new features
-- Update documentation
-- Use conventional commits
-- Ensure all tests pass (`cargo test`)
 
 ---
 
@@ -516,16 +548,20 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ### Project Information
 
-**Project:** RefiUp - Vault Distributor  
+**Project:** ReFi Universe - Smart Contracts Suite  
 **Event:** EthGlobal Buenos Aires 2025  
-**Category:** DeFi Infrastructure  
+**Category:** Regenerative Finance (ReFi)  
 **Blockchain:** Stellar (Soroban)
 
-### Team
+### Contracts
 
-**Developer:** Cristobal Valencia  
-**GitHub:** [@DevCristobalvc](https://github.com/DevCristobalvc)  
-**Repository:** [refi-universe-sc](https://github.com/DevCristobalvc/refi-universe-sc)
+1. **Vault Distributor** - Simple parameter-based distribution
+2. **Event Distributor** - Advanced validated participant management
+
+### Organization
+
+**Organization:** RefiUp  
+**Repository:** [github.com/refiup/sc](https://github.com/refiup/sc)
 
 ### Acknowledgments
 
@@ -537,10 +573,10 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 🔗 Links
 
-- **Contract Explorer:** [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM)
+- **Repository:** [github.com/refiup/sc](https://github.com/refiup/sc)
+- **Vault Distributor Explorer:** [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM)
 - **Stellar Docs:** [developers.stellar.org](https://developers.stellar.org)
 - **Soroban SDK:** [docs.rs/soroban-sdk](https://docs.rs/soroban-sdk)
-- **Repository:** [github.com/DevCristobalvc/refi-universe-sc](https://github.com/DevCristobalvc/refi-universe-sc)
 
 ---
 

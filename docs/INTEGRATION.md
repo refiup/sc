@@ -1,17 +1,33 @@
 # Frontend Integration Guide
 
-Guía para consumir el contrato Vault Distributor desde el frontend.
+Guía para integrar los contratos ReFi Universe (Vault Distributor y Event Distributor) en aplicaciones frontend.
 
-## 📋 Información del Contrato
+## 📋 Tabla de Contenidos
+
+- [Configuración](#-configuración)
+- [Vault Distributor Integration](#-vault-distributor-integration)
+- [Event Distributor Integration](#-event-distributor-integration)
+- [React Hooks](#-react-hooks)
+- [Ejemplos Completos](#-ejemplos-completos)
+
+---
+
+## ⚙️ Configuración
 
 ```javascript
 const CONFIG = {
-  contractId: "CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM",
+  // Network
   network: "testnet",
   networkPassphrase: "Test SDF Network ; September 2015",
   rpcUrl: "https://soroban-testnet.stellar.org",
   
-  // Vault RefiUp
+  // Vault Distributor
+  vaultDistributorId: "CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM",
+  
+  // Event Distributor (después del deployment)
+  eventDistributorId: "<YOUR_CONTRACT_ID>",
+  
+  // Vault RefiUp (Reference)
   vaultContractId: "CA3N53CPBLSVM5342DZ25LK47WFQDS6R3BT62327SGZCNJ54CDDXO7KZ",
   vaultManager: "GAUSHAKPQJEHLKT4FBUVMWXOX3HUVV5OXNFUY54OBWS2R7ZUQY6QUBR6",
   
@@ -451,11 +467,507 @@ function validateDistribution(recipients, totalAmount) {
 }
 ```
 
+---
+
+## 🎪 Event Distributor Integration
+
+### Configuración del Cliente
+
+```javascript
+import { Contract, SorobanRpc, TransactionBuilder } from '@stellar/stellar-sdk';
+
+class EventDistributorClient {
+  constructor(contractId, rpcUrl = CONFIG.rpcUrl) {
+    this.contractId = contractId;
+    this.server = new SorobanRpc.Server(rpcUrl);
+    this.contract = new Contract(contractId);
+  }
+  
+  // Helper para simular transacciones
+  async simulate(operation, account) {
+    const tx = new TransactionBuilder(account, {
+      fee: "100",
+      networkPassphrase: CONFIG.networkPassphrase
+    })
+    .addOperation(operation)
+    .setTimeout(30)
+    .build();
+    
+    return await this.server.simulateTransaction(tx);
+  }
+}
+```
+
+### Agregar Participante
+
+```javascript
+async function addHuman(walletProvider, humanAddress, ipfsHash) {
+  const client = new EventDistributorClient(CONFIG.eventDistributorId);
+  
+  // Obtener wallet del usuario
+  const publicKey = await walletProvider.getPublicKey();
+  const account = await client.server.getAccount(publicKey);
+  
+  // Crear operación
+  const operation = client.contract.call(
+    'add_human',
+    xdr.ScVal.scvAddress(humanAddress),
+    xdr.ScVal.scvString(ipfsHash)
+  );
+  
+  // Construir transacción
+  const tx = new TransactionBuilder(account, {
+    fee: "1000",
+    networkPassphrase: CONFIG.networkPassphrase
+  })
+  .addOperation(operation)
+  .setTimeout(30)
+  .build();
+  
+  // Firmar con wallet
+  const signedTx = await walletProvider.signTransaction(tx.toXDR());
+  
+  // Enviar
+  const result = await client.server.sendTransaction(signedTx);
+  return result;
+}
+```
+
+### Obtener Participante
+
+```javascript
+async function getHuman(humanAddress) {
+  const client = new EventDistributorClient(CONFIG.eventDistributorId);
+  
+  const operation = client.contract.call(
+    'get_human',
+    xdr.ScVal.scvAddress(humanAddress)
+  );
+  
+  // Simular (no requiere firma para queries)
+  const account = await client.server.getAccount(humanAddress);
+  const result = await client.simulate(operation, account);
+  
+  // Parse result
+  const humanData = result.result.retval;
+  return {
+    address: humanData.address,
+    validated: humanData.validated,
+    ipfsHash: humanData.ipfs_hash
+  };
+}
+```
+
+### Listar Todos los Participantes (con Paginación)
+
+```javascript
+async function getAllHumans(startIndex = 0, limit = 10) {
+  const client = new EventDistributorClient(CONFIG.eventDistributorId);
+  
+  const operation = client.contract.call(
+    'get_all_humans',
+    xdr.ScVal.scvU32(startIndex),
+    xdr.ScVal.scvU32(limit)
+  );
+  
+  const result = await client.simulate(operation, someAccount);
+  
+  // Parse array of humans
+  return result.result.retval.map(human => ({
+    address: human.address,
+    validated: human.validated,
+    ipfsHash: human.ipfs_hash
+  }));
+}
+```
+
+### Validar Participante (Solo Admin)
+
+```javascript
+async function updateHumanValidation(walletProvider, humanAddress, validated) {
+  const client = new EventDistributorClient(CONFIG.eventDistributorId);
+  
+  const publicKey = await walletProvider.getPublicKey();
+  const account = await client.server.getAccount(publicKey);
+  
+  const operation = client.contract.call(
+    'update_human_validation',
+    xdr.ScVal.scvAddress(humanAddress),
+    xdr.ScVal.scvBool(validated)
+  );
+  
+  const tx = new TransactionBuilder(account, {
+    fee: "1000",
+    networkPassphrase: CONFIG.networkPassphrase
+  })
+  .addOperation(operation)
+  .setTimeout(30)
+  .build();
+  
+  const signedTx = await walletProvider.signTransaction(tx.toXDR());
+  const result = await client.server.sendTransaction(signedTx);
+  
+  return result;
+}
+```
+
+### Crear Evento
+
+```javascript
+async function createEvent(walletProvider, eventId, location, pool) {
+  const client = new EventDistributorClient(CONFIG.eventDistributorId);
+  
+  const publicKey = await walletProvider.getPublicKey();
+  const account = await client.server.getAccount(publicKey);
+  
+  const operation = client.contract.call(
+    'create_event',
+    xdr.ScVal.scvString(eventId),
+    xdr.ScVal.scvString(location),
+    xdr.ScVal.scvI128(BigInt(pool))
+  );
+  
+  const tx = new TransactionBuilder(account, {
+    fee: "1000",
+    networkPassphrase: CONFIG.networkPassphrase
+  })
+  .addOperation(operation)
+  .setTimeout(30)
+  .build();
+  
+  const signedTx = await walletProvider.signTransaction(tx.toXDR());
+  return await client.server.sendTransaction(signedTx);
+}
+```
+
+### Obtener Evento
+
+```javascript
+async function getEvent(eventId) {
+  const client = new EventDistributorClient(CONFIG.eventDistributorId);
+  
+  const operation = client.contract.call(
+    'get_event',
+    xdr.ScVal.scvString(eventId)
+  );
+  
+  const result = await client.simulate(operation, someAccount);
+  
+  const eventData = result.result.retval;
+  return {
+    location: eventData.location,
+    eventName: eventData.event_name,
+    humans: eventData.humans, // Array of addresses
+    pool: eventData.pool
+  };
+}
+```
+
+### Obtener Participantes Validados de un Evento
+
+```javascript
+async function getEventValidatedHumans(eventId) {
+  const client = new EventDistributorClient(CONFIG.eventDistributorId);
+  
+  const operation = client.contract.call(
+    'get_event_validated_humans',
+    xdr.ScVal.scvString(eventId)
+  );
+  
+  const result = await client.simulate(operation, someAccount);
+  
+  // Returns array of validated addresses only
+  return result.result.retval; // Vec<Address>
+}
+```
+
+### Distribuir Pool del Evento
+
+```javascript
+async function distributeEventPool(walletProvider, eventId, tokenAddress) {
+  const client = new EventDistributorClient(CONFIG.eventDistributorId);
+  
+  const publicKey = await walletProvider.getPublicKey();
+  const account = await client.server.getAccount(publicKey);
+  
+  const operation = client.contract.call(
+    'distribute_event_pool',
+    xdr.ScVal.scvString(eventId),
+    xdr.ScVal.scvAddress(tokenAddress)
+  );
+  
+  const tx = new TransactionBuilder(account, {
+    fee: "5000", // Mayor fee para distribución
+    networkPassphrase: CONFIG.networkPassphrase
+  })
+  .addOperation(operation)
+  .setTimeout(60) // Mayor timeout
+  .build();
+  
+  const signedTx = await walletProvider.signTransaction(tx.toXDR());
+  return await client.server.sendTransaction(signedTx);
+}
+```
+
+---
+
+## ⚛️ React Hooks
+
+### useVaultDistributor Hook
+
+```javascript
+import { useState, useEffect } from 'react';
+
+function useVaultDistributor(contractId) {
+  const [admin, setAdmin] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  const getAdmin = async () => {
+    setLoading(true);
+    try {
+      const result = await getAdminFromContract(contractId);
+      setAdmin(result);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const distribute = async (token, recipients, totalAmount) => {
+    setLoading(true);
+    try {
+      const result = await distributeTokens(contractId, token, recipients, totalAmount);
+      return result;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    getAdmin();
+  }, [contractId]);
+  
+  return { admin, distribute, loading, error };
+}
+```
+
+### useEventDistributor Hook
+
+```javascript
+function useEventDistributor(contractId) {
+  const [humans, setHumans] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  
+  const loadHumans = async (start = 0, limit = 50) => {
+    setLoading(true);
+    try {
+      const result = await getAllHumans(start, limit);
+      setHumans(result);
+    } catch (err) {
+      console.error('Error loading humans:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const addHuman = async (address, ipfsHash) => {
+    setLoading(true);
+    try {
+      await addHumanToContract(contractId, address, ipfsHash);
+      await loadHumans(); // Reload list
+    } catch (err) {
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const validateHuman = async (address, validated) => {
+    setLoading(true);
+    try {
+      await updateHumanValidation(walletProvider, address, validated);
+      await loadHumans(); // Reload list
+    } catch (err) {
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    loadHumans();
+  }, [contractId]);
+  
+  return { humans, addHuman, validateHuman, loading };
+}
+```
+
+---
+
+## 📱 Ejemplos Completos
+
+### Ejemplo 1: Dashboard de Distribución (Vault Distributor)
+
+```jsx
+import React, { useState } from 'react';
+import { useVaultDistributor } from './hooks/useVaultDistributor';
+
+function DistributionDashboard() {
+  const { admin, distribute, loading } = useVaultDistributor(CONFIG.vaultDistributorId);
+  const [recipients, setRecipients] = useState(['', '', '']);
+  const [amount, setAmount] = useState('1000000000'); // 100 XLM
+  
+  const handleDistribute = async () => {
+    try {
+      const result = await distribute(
+        CONFIG.xlmTokenId,
+        recipients.filter(r => r !== ''),
+        parseInt(amount)
+      );
+      alert('Distribución exitosa!');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+  
+  return (
+    <div className="dashboard">
+      <h1>Vault Distributor</h1>
+      <p>Admin: {admin}</p>
+      
+      <div className="recipients">
+        {recipients.map((r, i) => (
+          <input
+            key={i}
+            value={r}
+            onChange={(e) => {
+              const newRecipients = [...recipients];
+              newRecipients[i] = e.target.value;
+              setRecipients(newRecipients);
+            }}
+            placeholder={`Recipient ${i + 1} (G...)`}
+          />
+        ))}
+      </div>
+      
+      <input
+        type="number"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="Total Amount (stroops)"
+      />
+      
+      <button onClick={handleDistribute} disabled={loading}>
+        {loading ? 'Distributing...' : 'Distribute'}
+      </button>
+    </div>
+  );
+}
+```
+
+### Ejemplo 2: Gestión de Eventos (Event Distributor)
+
+```jsx
+import React, { useState } from 'react';
+import { useEventDistributor } from './hooks/useEventDistributor';
+
+function EventManagement() {
+  const { humans, addHuman, validateHuman, loading } = useEventDistributor(CONFIG.eventDistributorId);
+  const [newHuman, setNewHuman] = useState({ address: '', ipfsHash: '' });
+  
+  const handleAddHuman = async () => {
+    try {
+      await addHuman(newHuman.address, newHuman.ipfsHash);
+      setNewHuman({ address: '', ipfsHash: '' });
+      alert('Participante agregado!');
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  };
+  
+  return (
+    <div className="event-management">
+      <h1>Event Distributor - Participants</h1>
+      
+      {/* Add Human Form */}
+      <div className="add-human">
+        <h2>Agregar Participante</h2>
+        <input
+          value={newHuman.address}
+          onChange={(e) => setNewHuman({...newHuman, address: e.target.value})}
+          placeholder="Stellar Address (G...)"
+        />
+        <input
+          value={newHuman.ipfsHash}
+          onChange={(e) => setNewHuman({...newHuman, ipfsHash: e.target.value})}
+          placeholder="IPFS Hash (Qm...)"
+        />
+        <button onClick={handleAddHuman} disabled={loading}>
+          Add Participant
+        </button>
+      </div>
+      
+      {/* Humans List */}
+      <div className="humans-list">
+        <h2>Participantes ({humans.length})</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>IPFS Hash</th>
+              <th>Validated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {humans.map((human, i) => (
+              <tr key={i}>
+                <td>{human.address.substring(0, 10)}...</td>
+                <td>{human.ipfsHash.substring(0, 15)}...</td>
+                <td>
+                  <span className={human.validated ? 'validated' : 'pending'}>
+                    {human.validated ? '✓ Validated' : '⏳ Pending'}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    onClick={() => validateHuman(human.address, !human.validated)}
+                    disabled={loading}
+                  >
+                    {human.validated ? 'Invalidate' : 'Validate'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
 ## 🌐 URLs Útiles
 
 **Stellar Explorer:**
-- Contrato: https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM
-- Vault: https://stellar.expert/explorer/testnet/contract/CA3N53CPBLSVM5342DZ25LK47WFQDS6R3BT62327SGZCNJ54CDDXO7KZ
+- Vault Distributor: https://stellar.expert/explorer/testnet/contract/CC4XEZG3JIVNTWGNPL4YKIWYECSOTS66SFLIDI3WU6RIJFNDNWPIMVHM
+- Vault RefiUp: https://stellar.expert/explorer/testnet/contract/CA3N53CPBLSVM5342DZ25LK47WFQDS6R3BT62327SGZCNJ54CDDXO7KZ
+
+**Documentation:**
+- Vault Distributor README: [../contracts/vault-distributor/README.md](../contracts/vault-distributor/README.md)
+- Event Distributor README: [../contracts/event-distributor/README.md](../contracts/event-distributor/README.md)
+
+---
+
+**Última actualización**: 22 de noviembre de 2025
 
 **RPC Endpoint:** https://soroban-testnet.stellar.org
 
