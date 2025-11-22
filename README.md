@@ -516,9 +516,11 @@ Comprehensive documentation available in the `docs/` directory:
 **Transactions:** 197+ XLM distributed
 
 #### Event Distributor
-**Status:** ✅ Ready for deployment  
-**Tests:** 23/23 passing  
-**Next Step:** Testnet deployment
+**Network:** Stellar Testnet  
+**Contract ID:** `CCHFGFX3S52UX46HZEBEGW5N2LDDYMSJDLZF4CQOZ6TSWWKFEG4TFPLS`  
+**Explorer:** [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CCHFGFX3S52UX46HZEBEGW5N2LDDYMSJDLZF4CQOZ6TSWWKFEG4TFPLS)  
+**Status:** ✅ Deployed & Initialized  
+**Tests:** 23/23 passing
 
 ### Technology Stack
 

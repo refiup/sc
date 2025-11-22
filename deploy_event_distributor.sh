@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 NETWORK="testnet"
 ADMIN_KEY_NAME="admin"
 CONTRACT_DIR="contracts/event-distributor"
-WASM_PATH="$CONTRACT_DIR/target/wasm32-unknown-unknown/release/event_distributor.wasm"
+WASM_PATH="target/wasm32-unknown-unknown/release/event_distributor.wasm"
 
 # Paso 1: Verificar directorio del contrato
 echo -e "${BLUE}📂 Paso 1: Verificando directorio del contrato...${NC}"
