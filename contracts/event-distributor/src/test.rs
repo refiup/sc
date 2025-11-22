@@ -468,3 +468,195 @@ fn test_distribute_amount_too_small() {
     // Try to distribute (should fail)
     client.distribute_event_pool(&event_id, &token.address());
 }
+
+// ========== ADDITIONAL TESTS ==========
+
+#[test]
+fn test_pagination_with_many_humans() {
+    let (env, admin, _, _, _) = create_test_env();
+    let contract_id = setup_contract(&env, &admin);
+    let client = EventDistributorClient::new(&env, &contract_id);
+    
+    // Add 10 humans
+    let ipfs_hashes = ["QmTest0", "QmTest1", "QmTest2", "QmTest3", "QmTest4", 
+                       "QmTest5", "QmTest6", "QmTest7", "QmTest8", "QmTest9"];
+    
+    for hash in &ipfs_hashes {
+        let human = Address::generate(&env);
+        let ipfs = String::from_str(&env, hash);
+        client.add_human(&human, &ipfs);
+    }
+    
+    // Test pagination
+    let page1 = client.get_all_humans(&0, &5);
+    assert_eq!(page1.len(), 5);
+    
+    let page2 = client.get_all_humans(&5, &5);
+    assert_eq!(page2.len(), 5);
+    
+    let all = client.get_all_humans(&0, &20);
+    assert_eq!(all.len(), 10);
+}
+
+#[test]
+fn test_update_image_multiple_times() {
+    let (env, admin, human1, _, _) = create_test_env();
+    let contract_id = setup_contract(&env, &admin);
+    let client = EventDistributorClient::new(&env, &contract_id);
+    
+    let hash1 = String::from_str(&env, "QmHash1");
+    client.add_human(&human1, &hash1);
+    
+    let hash2 = String::from_str(&env, "QmHash2");
+    client.update_human_image(&human1, &hash2);
+    assert_eq!(client.get_human(&human1).ipfs_hash, hash2);
+    
+    let hash3 = String::from_str(&env, "QmHash3");
+    client.update_human_image(&human1, &hash3);
+    assert_eq!(client.get_human(&human1).ipfs_hash, hash3);
+}
+
+#[test]
+fn test_validation_toggle() {
+    let (env, admin, human1, _, _) = create_test_env();
+    let contract_id = setup_contract(&env, &admin);
+    let client = EventDistributorClient::new(&env, &contract_id);
+    
+    client.add_human(&human1, &String::from_str(&env, "QmTest"));
+    
+    // Start as false
+    assert_eq!(client.get_human(&human1).validated, false);
+    
+    // Toggle to true
+    client.update_human_validation(&human1, &true);
+    assert_eq!(client.get_human(&human1).validated, true);
+    
+    // Toggle back to false
+    client.update_human_validation(&human1, &false);
+    assert_eq!(client.get_human(&human1).validated, false);
+}
+
+#[test]
+fn test_multiple_events_same_human() {
+    let (env, admin, human1, _, _) = create_test_env();
+    let contract_id = setup_contract(&env, &admin);
+    let client = EventDistributorClient::new(&env, &contract_id);
+    
+    client.add_human(&human1, &String::from_str(&env, "QmTest"));
+    client.update_human_validation(&human1, &true);
+    
+    // Create multiple events
+    let event1 = String::from_str(&env, "event_001");
+    let event2 = String::from_str(&env, "event_002");
+    
+    client.create_event(&event1, &String::from_str(&env, "BA"), &String::from_str(&env, "ReFi BA"), &1000);
+    client.create_event(&event2, &String::from_str(&env, "NY"), &String::from_str(&env, "ReFi NY"), &2000);
+    
+    // Add human to both events
+    client.add_human_to_event(&event1, &human1);
+    client.add_human_to_event(&event2, &human1);
+    
+    assert_eq!(client.get_event(&event1).humans.len(), 1);
+    assert_eq!(client.get_event(&event2).humans.len(), 1);
+}
+
+#[test]
+fn test_large_pool_distribution() {
+    let (env, admin, human1, human2, _) = create_test_env();
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract_v2(token_admin.clone());
+    
+    let contract_id = setup_contract(&env, &admin);
+    let client = EventDistributorClient::new(&env, &contract_id);
+    
+    // Large pool: 10 billion stroops (1000 XLM)
+    let large_pool = 10_000_000_000i128;
+    token::StellarAssetClient::new(&env, &token.address()).mint(&contract_id, &large_pool);
+    
+    client.add_human(&human1, &String::from_str(&env, "QmTest1"));
+    client.add_human(&human2, &String::from_str(&env, "QmTest2"));
+    client.update_human_validation(&human1, &true);
+    client.update_human_validation(&human2, &true);
+    
+    let event_id = String::from_str(&env, "big_event");
+    client.create_event(&event_id, &String::from_str(&env, "Global"), &String::from_str(&env, "Big Event"), &large_pool);
+    client.add_human_to_event(&event_id, &human1);
+    client.add_human_to_event(&event_id, &human2);
+    
+    client.distribute_event_pool(&event_id, &token.address());
+    
+    let token_client = token::Client::new(&env, &token.address());
+    assert_eq!(token_client.balance(&human1), 5_000_000_000); // 500 XLM each
+    assert_eq!(token_client.balance(&human2), 5_000_000_000);
+}
+
+#[test]
+fn test_event_with_no_participants() {
+    let (env, admin, _, _, _) = create_test_env();
+    let contract_id = setup_contract(&env, &admin);
+    let client = EventDistributorClient::new(&env, &contract_id);
+    
+    let event_id = String::from_str(&env, "empty_event");
+    client.create_event(
+        &event_id,
+        &String::from_str(&env, "Location"),
+        &String::from_str(&env, "Empty Event"),
+        &1000000,
+    );
+    
+    let event = client.get_event(&event_id);
+    assert_eq!(event.humans.len(), 0);
+    assert_eq!(event.pool, 1000000);
+}
+
+#[test]
+fn test_get_validated_humans_empty_event() {
+    let (env, admin, _, _, _) = create_test_env();
+    let contract_id = setup_contract(&env, &admin);
+    let client = EventDistributorClient::new(&env, &contract_id);
+    
+    let event_id = String::from_str(&env, "event_001");
+    client.create_event(
+        &event_id,
+        &String::from_str(&env, "Location"),
+        &String::from_str(&env, "Event"),
+        &1000,
+    );
+    
+    let validated = client.get_event_validated_humans(&event_id);
+    assert_eq!(validated.len(), 0);
+}
+
+#[test]
+fn test_distribution_with_odd_division() {
+    let (env, admin, human1, human2, human3) = create_test_env();
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract_v2(token_admin.clone());
+    
+    let contract_id = setup_contract(&env, &admin);
+    let client = EventDistributorClient::new(&env, &contract_id);
+    
+    // Pool of 1000 for 3 people = 333 each (1 remainder lost)
+    token::StellarAssetClient::new(&env, &token.address()).mint(&contract_id, &1000);
+    
+    client.add_human(&human1, &String::from_str(&env, "QmTest1"));
+    client.add_human(&human2, &String::from_str(&env, "QmTest2"));
+    client.add_human(&human3, &String::from_str(&env, "QmTest3"));
+    client.update_human_validation(&human1, &true);
+    client.update_human_validation(&human2, &true);
+    client.update_human_validation(&human3, &true);
+    
+    let event_id = String::from_str(&env, "event_001");
+    client.create_event(&event_id, &String::from_str(&env, "Loc"), &String::from_str(&env, "Evt"), &1000);
+    client.add_human_to_event(&event_id, &human1);
+    client.add_human_to_event(&event_id, &human2);
+    client.add_human_to_event(&event_id, &human3);
+    
+    client.distribute_event_pool(&event_id, &token.address());
+    
+    let token_client = token::Client::new(&env, &token.address());
+    assert_eq!(token_client.balance(&human1), 333);
+    assert_eq!(token_client.balance(&human2), 333);
+    assert_eq!(token_client.balance(&human3), 333);
+    // 1 stroops lost in division
+}
