@@ -16,11 +16,12 @@ module.exports = {
   networks: {
     // Celo Alfajores Testnet
     alfajores: {
-      url: "https://alfajores-forno.celo-testnet.org",
+      url: process.env.ALFAJORES_RPC_URL || "https://alfajores-forno.celo-testnet.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 44787,
       gas: 8000000,
-      gasPrice: 20000000000 // 20 gwei
+      gasPrice: 20000000000, // 20 gwei
+      timeout: 120000
     },
     // Celo Mainnet
     celo: {

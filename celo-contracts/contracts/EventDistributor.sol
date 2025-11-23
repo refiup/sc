@@ -258,7 +258,7 @@ contract EventDistributor is Ownable, ReentrancyGuard {
         uint256 _eventId,
         address _token,
         uint256 _totalAmount
-    ) external onlyOwner nonReentrant {
+    ) external payable onlyOwner nonReentrant {
         if (_totalAmount == 0) revert InvalidAmount();
         
         address[] memory validatedParticipants = getValidatedParticipants(_eventId);
@@ -293,7 +293,7 @@ contract EventDistributor is Ownable, ReentrancyGuard {
         address[] calldata _recipients,
         address _token,
         uint256 _totalAmount
-    ) external onlyOwner nonReentrant {
+    ) external payable onlyOwner nonReentrant {
         if (_recipients.length == 0) revert NoValidatedParticipants();
         if (_totalAmount == 0) revert InvalidAmount();
         

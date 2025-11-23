@@ -9,89 +9,139 @@ Guías completas para integrar el frontend con los smart contracts de ReFi Unive
 ### 📱 [GUIDE_INTEGRATION_APP.md](GUIDE_INTEGRATION_APP.md)
 **Para: App de Usuario (Participantes)**
 
-Flujo completo para que los usuarios:
-- 📸 Capturen su foto (cámara o upload)
-- 📤 Suban imagen a IPFS
-- 🔗 Conecten su wallet (MetaMask/Valora)
-- ✅ Se registren en el contrato
+Flujo simplificado para que los usuarios:
+- 📸 Capturen su foto (cámara) o suban archivo
+- 📋 Ingresen su dirección de wallet Celo
+- ✅ Envíen datos al backend
 - 🔍 Verifiquen su estado de validación
 
-**Stack:**
-- React + ethers.js/wagmi
-- Celo network (Alfajores testnet)
-- IPFS para almacenamiento de imágenes
-- MetaMask o Valora wallet
+**El frontend solo maneja:**
+- Captura/upload de imagen
+- Conversión de imagen a Base64
+- Formulario con dirección de wallet
+- Envío al backend
 
 ---
 
 ### 👨‍⚖️ [GUIDE_INTEGRATION_JUDGE.md](GUIDE_INTEGRATION_JUDGE.md)
 **Para: App del Juez (Administrador)**
 
-Dashboard completo para que el juez:
-- 👥 Vea galería de participantes
+Dashboard para que el juez:
+- 👥 Vea galería de participantes (imagen Base64 + dirección)
 - ✅ Valide o rechace fotos
 - 🎪 Cree eventos
-- 💰 Distribuya fondos (CELO, cUSD, cEUR)
+- 💰 Distribuya fondos a direcciones validadas
 - 📊 Monitoree estadísticas
 
-**Stack:**
-- React + ethers.js/wagmi
-- Admin dashboard
-- Multi-token support (CELO, cUSD, cEUR, cREAL)
+**El backend maneja:**
+- Conexión con el contrato Celo
+- Registro de usuarios en blockchain
+- Validación de participantes
+- Distribución de recompensas
 
 ---
 
-## 🌐 Diferencias con Stellar
+## 🌐 Arquitectura Simplificada
 
-| Aspecto | Stellar (Soroban) | Celo (EVM) |
-|---------|-------------------|------------|
-| **Wallet** | Freighter | MetaMask/Valora |
-| **SDK** | @stellar/stellar-sdk | ethers.js/viem/wagmi |
-| **Gas** | Stroops (XLM) | Wei (CELO) |
-| **Tokens** | Stellar assets | ERC20 (cUSD, cEUR, etc.) |
-| **Network ID** | "testnet" | Chain ID: 44787 |
-| **Explorer** | stellar.expert | celoscan.io |
+### Frontend (Usuario)
+```
+1. Usuario captura foto o sube archivo
+2. Frontend convierte imagen a Base64
+3. Usuario ingresa su dirección de wallet Celo
+4. Frontend envía {imageBase64, walletAddress} al backend
+5. Backend procesa y registra en blockchain
+```
+
+### Backend (Admin)
+```
+1. Recibe {imageBase64, walletAddress}
+2. Conecta con contrato Celo vía ethers.js
+3. Ejecuta: addHuman(walletAddress, imageBase64)
+4. Juez valida: updateHumanValidation(walletAddress, true/false)
+5. Distribución: distributeToEvent(eventId, token, amount)
+```
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Instalación
-```bash
-npm install ethers wagmi viem @tanstack/react-query
+### Frontend (Usuario)
+
+**1. Captura de Imagen:**
+```html
+<!-- Opción 1: Tomar foto con cámara -->
+<input type="file" accept="image/*" capture="camera" id="camera-input" />
+
+<!-- Opción 2: Subir archivo -->
+<input type="file" accept="image/*" id="file-input" />
 ```
 
-### 2. Variables de Entorno
+**2. Convertir a Base64:**
+```javascript
+function convertToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Uso
+const file = event.target.files[0];
+const imageBase64 = await convertToBase64(file);
+// Resultado: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+```
+
+**3. Formulario de Dirección:**
+```html
+<input 
+  type="text" 
+  placeholder="0x..." 
+  pattern="0x[a-fA-F0-9]{40}"
+  required 
+/>
+```
+
+**4. Envío al Backend:**
+```javascript
+const response = await fetch('/api/register', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    imageBase64: imageBase64,
+    walletAddress: walletAddress
+  })
+});
+```
+
+### Backend (Node.js + ethers.js)
+
+**Variables de Entorno:**
 ```env
-# .env.local
-REACT_APP_NETWORK=alfajores
-REACT_APP_CHAIN_ID=44787
-REACT_APP_RPC_URL=https://alfajores-forno.celo-testnet.org
-
-# Contract Address (después de deployment)
-REACT_APP_EVENT_DISTRIBUTOR=0x...
-
-# IPFS
-REACT_APP_PINATA_API_KEY=tu_api_key
-REACT_APP_PINATA_SECRET_KEY=tu_secret_key
+# .env
+CELO_RPC_URL=https://alfajores-forno.celo-testnet.org
+CELO_CHAIN_ID=44787
+CONTRACT_ADDRESS=0x...
+ADMIN_PRIVATE_KEY=0x...
 ```
 
-### 3. Add Celo to MetaMask
+**Registro en Blockchain:**
+```javascript
+const ethers = require('ethers');
 
-**Alfajores Testnet:**
+// Conectar al contrato
+const provider = new ethers.JsonRpcProvider(process.env.CELO_RPC_URL);
+const wallet = new ethers.Wallet(process.env.ADMIN_PRIVATE_KEY, provider);
+const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
+
+// Registrar usuario
+async function registerUser(walletAddress, imageBase64) {
+  const tx = await contract.addHuman(walletAddress, imageBase64);
+  await tx.wait();
+  return tx.hash;
+}
 ```
-Network Name: Celo Alfajores
-RPC URL: https://alfajores-forno.celo-testnet.org
-Chain ID: 44787
-Currency: CELO
-Explorer: https://alfajores.celoscan.io
-```
-
-### 4. Get Testnet Tokens
-
-**Faucet:** https://faucet.celo.org/alfajores
-- Get CELO for gas
-- Get cUSD for testing distributions
 
 ---
 
@@ -120,24 +170,25 @@ Explorer: https://alfajores.celoscan.io
 ## 🎯 Flujos de Usuario
 
 ### Usuario (Participante)
-```mermaid
-graph LR
-    A[Abrir App] --> B[Conectar Wallet<br/>MetaMask/Valora]
-    B --> C[Capturar Foto]
-    C --> D[Subir a IPFS]
-    D --> E[Admin registra<br/>en Contract]
-    E --> F[Esperar Validación]
-    F --> G[Verificar Estado]
+```
+1. Abrir App
+2. Capturar foto o subir imagen
+3. Frontend convierte imagen a Base64
+4. Ingresar dirección de wallet Celo (0x...)
+5. Enviar formulario
+6. Backend registra en blockchain
+7. Esperar validación del juez
+8. Recibir recompensas en la dirección proporcionada
 ```
 
 ### Juez (Admin)
-```mermaid
-graph LR
-    A[Login Admin] --> B[Ver Participantes]
-    B --> C[Validar Fotos]
-    C --> D[Crear Evento]
-    D --> E[Seleccionar Token<br/>CELO/cUSD/cEUR]
-    E --> F[Distribuir Fondos]
+```
+1. Ver lista de participantes (imagen + dirección)
+2. Revisar fotos
+3. Validar (✅) o rechazar (❌) cada participante
+4. Crear evento con participantes validados
+5. Distribuir fondos a direcciones validadas
+6. Los usuarios reciben CELO/tokens en sus wallets
 ```
 
 ---
@@ -174,106 +225,181 @@ await distributeToEvent(eventId, cREAL, amountInWei);
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 📋 Datos que Maneja el Frontend
 
-### Wagmi (Recomendado)
+### Input del Usuario:
 ```javascript
-import { useAccount, useContractWrite } from 'wagmi';
-
-const { address } = useAccount();
-
-const { write } = useContractWrite({
-  address: CONTRACT_ADDRESS,
-  abi: ABI,
-  functionName: 'addHuman'
-});
+{
+  imageBase64: "data:image/jpeg;base64,/9j/4AAQSkZJRg...",  // Imagen convertida
+  walletAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"  // Dirección Celo
+}
 ```
 
-### ethers.js (Alternativa)
-```javascript
-import { ethers } from 'ethers';
+### Validaciones Frontend:
+- ✅ Imagen no mayor a 5MB
+- ✅ Formato: JPG, PNG, WEBP
+- ✅ Dirección válida (0x + 40 caracteres hexadecimales)
+- ✅ No campos vacíos
 
-const provider = new ethers.BrowserProvider(window.ethereum);
-const signer = await provider.getSigner();
-const contract = new ethers.Contract(address, abi, signer);
+### Respuesta del Backend:
+```javascript
+{
+  success: true,
+  txHash: "0xabc123...",  // Hash de transacción en Celo
+  message: "Usuario registrado exitosamente"
+}
 ```
 
 ---
 
-## 📱 Soporte Mobile
+## 🔧 Ejemplo Completo Frontend
 
-### Valora Wallet
-- Wallet nativa de Celo
-- WalletConnect integrado
-- Fácil onboarding
-- Soporte para cUSD, cEUR, cREAL
+### HTML Simple
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ReFi Universe - Registro</title>
+</head>
+<body>
+  <h1>Registro de Participante</h1>
+  
+  <form id="registerForm">
+    <!-- Captura de foto -->
+    <label>Tomar foto o subir imagen:</label>
+    <input type="file" accept="image/*" id="imageInput" required />
+    
+    <img id="preview" style="max-width: 300px; display: none;" />
+    
+    <!-- Dirección de wallet -->
+    <label>Dirección de wallet Celo:</label>
+    <input 
+      type="text" 
+      id="walletAddress" 
+      placeholder="0x..." 
+      pattern="0x[a-fA-F0-9]{40}"
+      required 
+    />
+    
+    <button type="submit">Registrar</button>
+  </form>
 
-### MetaMask Mobile
-- Compatible con Celo
-- Necesita configuración manual de red
-- WalletConnect
-
----
-
-## 🔧 Testing
-
-### Test de Usuario
-```javascript
-// 1. Conectar wallet
-const accounts = await window.ethereum.request({ 
-  method: 'eth_requestAccounts' 
-});
-
-// 2. Subir imagen a IPFS
-const ipfsHash = await uploadToIPFS(imageBase64);
-
-// 3. El admin registra al usuario
-// (En producción, esto sería automático o vía backend)
-
-// 4. Verificar estado
-const human = await contract.getHuman(accounts[0]);
-console.log('Validado:', human.validated);
+  <script>
+    const form = document.getElementById('registerForm');
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    
+    // Previsualizar imagen
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+      }
+    });
+    
+    // Enviar formulario
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const file = imageInput.files[0];
+      const walletAddress = document.getElementById('walletAddress').value;
+      
+      // Convertir a Base64
+      const imageBase64 = await convertToBase64(file);
+      
+      // Enviar al backend
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64, walletAddress })
+      });
+      
+      const result = await response.json();
+      alert(result.message);
+    });
+    
+    function convertToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+</body>
+</html>
 ```
 
-### Test de Juez
+### Backend API (Node.js + Express)
 ```javascript
-// 1. Conectar admin wallet
-const signer = await provider.getSigner();
+const express = require('express');
+const ethers = require('ethers');
 
-// 2. Ver participantes
-const humans = await contract.getAllHumans(0, 10);
+const app = express();
+app.use(express.json({ limit: '10mb' }));
 
-// 3. Validar
-await contract.updateHumanValidation(humans[0].walletAddress, true);
+// Configuración
+const provider = new ethers.JsonRpcProvider(process.env.CELO_RPC_URL);
+const wallet = new ethers.Wallet(process.env.ADMIN_PRIVATE_KEY, provider);
+const contract = new ethers.Contract(
+  process.env.CONTRACT_ADDRESS,
+  ABI,
+  wallet
+);
 
-// 4. Crear evento
-const validated = await contract.getValidatedHumans();
-await contract.createEvent("Test Event", validated);
+// Endpoint de registro
+app.post('/api/register', async (req, res) => {
+  try {
+    const { imageBase64, walletAddress } = req.body;
+    
+    // Validar
+    if (!imageBase64 || !walletAddress) {
+      return res.status(400).json({ error: 'Faltan datos' });
+    }
+    
+    // Registrar en blockchain
+    const tx = await contract.addHuman(walletAddress, imageBase64);
+    await tx.wait();
+    
+    res.json({
+      success: true,
+      txHash: tx.hash,
+      message: 'Usuario registrado exitosamente'
+    });
+    
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-// 5. Distribuir cUSD
-const cUSD = '0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1';
-const amount = ethers.parseEther('100'); // 100 cUSD
-await contract.distributeToEvent(0, cUSD, amount);
+app.listen(3000);
 ```
 
 ---
 
 ## 🐛 Troubleshooting
 
-### "MetaMask not found"
-→ Instalar desde https://metamask.io/
+### "Imagen muy grande"
+→ Limitar tamaño a 5MB máximo
+→ Comprimir imagen antes de convertir a Base64
 
-### "Wrong network"
-→ Agregar Celo Alfajores a MetaMask (ver Quick Start)
+### "Dirección inválida"
+→ Verificar formato: 0x + 40 caracteres hexadecimales
+→ Ejemplo válido: `0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb`
 
-### "Insufficient funds"
-→ Usar faucet: https://faucet.celo.org/alfajores
+### "Error al subir imagen"
+→ Verificar que el formato sea JPG, PNG o WEBP
+→ Revisar que FileReader esté soportado
 
-### "Gas estimation failed"
-→ Verificar que la función existe y parámetros son correctos
+### "Backend no responde"
+→ Verificar que el backend esté corriendo
+→ Revisar CORS si frontend y backend están en dominios diferentes
 
 ### "Transaction reverted"
-→ Revisar que cumples los requisitos (ej: ser admin)
+→ Verificar que el backend tenga fondos CELO para gas
+→ Verificar que la dirección del contrato sea correcta
 
 ---
 
@@ -298,57 +424,125 @@ await contract.distributeToEvent(0, cUSD, amount);
 
 ## ✅ Checklist de Implementación
 
-### Usuario App
-- [ ] Instalar dependencias (ethers.js o wagmi)
-- [ ] Configurar variables de entorno
-- [ ] Agregar Celo Alfajores a MetaMask
-- [ ] Copiar `services/ipfsService.js` (mismo que Stellar)
-- [ ] Copiar `services/celoContractService.js`
-- [ ] Implementar componente de registro
-- [ ] Agregar CSS
-- [ ] Probar con testnet tokens
+### Frontend (Usuario)
+- [ ] Input para captura/upload de imagen
+- [ ] Función para convertir imagen a Base64
+- [ ] Input para dirección de wallet (validación 0x...)
+- [ ] Previsualización de imagen
+- [ ] Validación de tamaño (< 5MB)
+- [ ] Formulario de envío
+- [ ] Llamada POST al backend con {imageBase64, walletAddress}
+- [ ] Mensaje de confirmación/error
 
-### Juez App
-- [ ] Instalar dependencias
-- [ ] Configurar variables de entorno
-- [ ] Fondear cuenta admin
-- [ ] Copiar `services/celoJudgeService.js`
-- [ ] Implementar dashboard
-- [ ] Implementar galería
-- [ ] Implementar gestor de eventos
-- [ ] Implementar selector de tokens
-- [ ] Probar distribuciones
+### Backend (Admin)
+- [ ] Instalar ethers.js: `npm install ethers`
+- [ ] Configurar variables de entorno (.env)
+- [ ] Obtener CELO de prueba para cuenta admin
+- [ ] Endpoint POST /api/register
+- [ ] Conectar con contrato Celo
+- [ ] Función registerUser(walletAddress, imageBase64)
+- [ ] Manejo de errores
+- [ ] Logs de transacciones
 
----
-
-## 📊 Gas Costs Comparison
-
-| Red | Gas Price | Tx Cost (transfer) | Tx Cost (complex) |
-|-----|-----------|-------------------|-------------------|
-| Ethereum | ~30 Gwei | ~$2-5 | ~$10-50 |
-| Polygon | ~50 Gwei | ~$0.01-0.05 | ~$0.1-0.5 |
-| **Celo** | **~0.5 Gwei** | **~$0.001** | **~$0.01** |
-
-**✨ Celo es MUY económico para usuarios!**
+### Juez Dashboard
+- [ ] Obtener lista de participantes: getAllHumans()
+- [ ] Mostrar galería (imagen Base64 + dirección)
+- [ ] Botón validar/rechazar por participante
+- [ ] Función updateHumanValidation(address, true/false)
+- [ ] Crear eventos con participantes validados
+- [ ] Distribuir fondos: distributeToEvent()
+- [ ] Historial de transacciones
 
 ---
 
-## 🎉 Ventajas de Celo
+## 🎯 Resumen del Flujo
 
-✅ **Gas ultra-bajo** (~1000x más barato que Ethereum)  
-✅ **Stablecoins nativos** (cUSD, cEUR, cREAL)  
-✅ **Mobile-first** (Valora wallet)  
-✅ **Carbon negative** (ReFi nativo)  
-✅ **Compatible EVM** (todas las herramientas Ethereum funcionan)  
-✅ **Fast** (5 segundos por bloque)
+```
+┌─────────────────────────────────────────────────────────┐
+│                    FRONTEND (Usuario)                    │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  1. Usuario toma foto o sube imagen                     │
+│  2. JavaScript convierte imagen a Base64                │
+│  3. Usuario ingresa dirección wallet: 0x...             │
+│  4. Click "Enviar"                                       │
+│                                                          │
+│  POST /api/register                                      │
+│  {                                                       │
+│    imageBase64: "data:image/jpeg;base64,...",           │
+│    walletAddress: "0x742d35Cc6634C0532..."             │
+│  }                                                       │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                 BACKEND (Node.js + ethers)               │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  1. Recibe datos del frontend                           │
+│  2. Conecta con contrato Celo (ethers.js)               │
+│  3. Ejecuta: addHuman(walletAddress, imageBase64)       │
+│  4. Espera confirmación de transacción                  │
+│  5. Retorna txHash al frontend                          │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│              BLOCKCHAIN CELO (Alfajores)                 │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  ✅ Participante registrado en el contrato              │
+│  📍 Dirección: 0x742d35Cc6634C0532...                   │
+│  📸 Imagen: stored as Base64 string                     │
+│  ⏳ Estado: Pendiente de validación                     │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                  DASHBOARD JUEZ                          │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  1. Juez ve galería de participantes                    │
+│  2. Revisa imagen (mostrar Base64 como <img>)           │
+│  3. Valida: updateHumanValidation(address, true)        │
+│  4. Crea evento con validados                           │
+│  5. Distribuye: distributeToEvent(eventId, token, amt)  │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                 USUARIO RECIBE FONDOS                    │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  💰 CELO/cUSD enviados a la dirección proporcionada     │
+│  📱 Usuario puede ver fondos en cualquier wallet        │
+│  🔍 Transacción visible en Celoscan                     │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+```
 
 ---
 
-**🎉 ¡Todo listo para construir en Celo!**
+## 🎉 Ventajas de este Enfoque
 
-**Next Steps:**
-1. Lee la guía correspondiente (Usuario o Juez)
-2. Configura MetaMask con Alfajores
-3. Obtén tokens del faucet
-4. Copia los servicios y componentes
-5. ¡Prueba en testnet!
+✅ **Sin wallet connect** - Usuario solo proporciona dirección  
+✅ **Sin IPFS** - Imágenes en Base64 directamente en blockchain  
+✅ **Flujo simple** - 2 campos: imagen + dirección  
+✅ **Backend controla todo** - Seguridad y gas manejados centralmente  
+✅ **Costo bajo** - ~$0.001 por registro en Celo  
+✅ **Distribución directa** - Fondos van directo a la dirección del usuario  
+
+---
+
+**🚀 ¡Listo para implementar!**
+
+**Para desplegar en Celo Alfajores:**
+1. Obtén CELO de prueba: https://faucet.celo.org/alfajores
+2. Ejecuta: `npm run deploy:alfajores`
+3. Copia el contract address al backend
+4. Implementa el frontend simple
+5. ¡Prueba el flujo completo!
