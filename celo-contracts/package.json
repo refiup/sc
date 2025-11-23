@@ -1,0 +1,26 @@
+{
+  "name": "refi-universe-celo-contracts",
+  "version": "1.0.0",
+  "description": "ReFi Universe Smart Contracts for Celo",
+  "main": "index.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:alfajores": "hardhat run scripts/deploy.js --network alfajores",
+    "deploy:celo": "hardhat run scripts/deploy.js --network celo",
+    "verify:alfajores": "hardhat verify --network alfajores",
+    "clean": "hardhat clean"
+  },
+  "keywords": ["celo", "smart-contracts", "refi", "hardhat", "solidity"],
+  "author": "ReFi Universe",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "^16.3.1"
+  }
+}
