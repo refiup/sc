@@ -42,12 +42,24 @@ Advanced contract with on-chain storage for validated participants and event man
 - [Contracts](#-contracts)
 - [Overview](#-overview)
 - [Architecture](#-architecture)
+- [Frontend Integration](#-frontend-integration)
 - [Quick Start](#-quick-start)
 - [Testing](#-testing)
 - [Deployment](#-deployment)
 - [Documentation](#-documentation)
 - [Project Status](#-project-status)
 - [License](#-license)
+
+---
+
+## 🚀 Frontend Integration
+
+**New!** Complete integration guide for frontend developers:
+
+📖 **[FRONTEND_README.md](FRONTEND_README.md)** - Quick start (3 steps)  
+📚 **[docs/FRONTEND_INTEGRATION.md](docs/FRONTEND_INTEGRATION.md)** - Complete guide with code
+
+**TL;DR:** Frontend sends **imagen Base64 + dirección pública** → Contract stores on Stellar + IPFS
 
 ---
 
